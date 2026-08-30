@@ -592,12 +592,14 @@ button:hover {
 /* ---- 문서 미리보기 (원본 결석신고서 양식 재현) ---- */
 
 .document {
-  border: 1px solid #333;
+  border: 1.5px solid #000;
   padding: 110px 70px 100px;
   margin-top: 12px;
   font-size: 14px;
   line-height: 2.3;
   background: #fff;
+  color: #000;
+  font-weight: 600;
   width: 794px;
   max-width: 100%;
   margin-left: auto;
@@ -693,7 +695,7 @@ button:hover {
 }
 
 .dotted-rule {
-  border-top: 1px dashed #333;
+  border-top: 1.5px dashed #000;
   margin: 28px 0;
 }
 
@@ -713,7 +715,7 @@ button:hover {
 }
 
 .approval-table th, .approval-table td {
-  border: 1px solid #333;
+  border: 1.5px solid #000;
   width: 72px;
   height: 24px;
   text-align: center;
@@ -727,6 +729,10 @@ button:hover {
 .note {
   font-size: 12px;
   color: var(--muted);
+}
+
+.document .note {
+  color: #000;
 }
 
 .school-title {
@@ -889,7 +895,7 @@ button:hover {
 /* ---- 지각·조퇴·결과 확인서 공용 ---- */
 
 .solid-rule {
-  border-top: 1px solid #333;
+  border-top: 1.5px solid #000;
   margin: 24px 0;
 }
 
@@ -900,7 +906,7 @@ button:hover {
 }
 
 .record-table th, .record-table td {
-  border: 1px solid #666;
+  border: 1.5px solid #000;
   padding: 14px 6px;
   font-size: 13px;
   text-align: center;
@@ -920,7 +926,7 @@ button:hover {
 }
 
 .approval-table2 th, .approval-table2 td {
-  border: 1px solid #333;
+  border: 1.5px solid #000;
   width: 95px;
   height: 34px;
   text-align: center;

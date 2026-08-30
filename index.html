@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>출결 업무 도우미</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <h1>출결 업무 도우미</h1>
+      <button type="button" id="help-btn" class="help-btn">사용방법 보기</button>
+    </div>
+
+    <div id="help-modal" class="modal-overlay" style="display:none;">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h2>나이스에서 "월별 출결 현황" PDF 내려받는 방법</h2>
+          <button type="button" id="help-close-btn" class="modal-close-btn" aria-label="닫기">&times;</button>
+        </div>
+        <ol class="help-steps">
+          <li>
+            <p><span class="help-step-no">1</span> NEIS에 로그인한 뒤, 상단 메뉴에서 <b>학급담임</b>을 클릭합니다.</p>
+            <img src="설명서/1.jpg" alt="학급담임 메뉴 클릭">
+          </li>
+          <li>
+            <p><span class="help-step-no">2</span> 왼쪽 "학적" 항목에서 <b>출결현황및통계</b>를 클릭합니다.</p>
+            <img src="설명서/2.jpg" alt="출결현황및통계 클릭">
+          </li>
+          <li>
+            <p><span class="help-step-no">3</span> 화면 오른쪽 위 <b>월별 출결현황</b> 버튼을 클릭합니다.</p>
+            <img src="설명서/3.jpg" alt="월별 출결현황 버튼 클릭">
+          </li>
+          <li>
+            <p><span class="help-step-no">4</span> 새로 뜬 창에서 조회 기간을 확인한 뒤 <b>조회</b>를 누르고, 결과가 나오면 <b>월별출력</b>을 클릭합니다.</p>
+            <img src="설명서/4.jpg" alt="조회 후 월별출력 클릭">
+          </li>
+          <li>
+            <p><span class="help-step-no">5</span> 미리보기 화면 위쪽 저장 아이콘을 눌러 <b>PDF</b>를 선택하면 파일이 다운로드됩니다. 이렇게 받은 PDF를 왼쪽 "월별 출결 현황 업로드"에서 올려주세요.</p>
+            <img src="설명서/5.jpg" alt="PDF로 저장">
+          </li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="stack">
+        <div class="panel" id="settings-panel">
+          <h2>기본 정보 설정</h2>
+
+          <div class="row">
+            <label>학년</label>
+            <select id="setting-grade">
+              <option value="1">1학년</option>
+              <option value="2">2학년</option>
+              <option value="3">3학년</option>
+            </select>
+            <label>반</label>
+            <select id="setting-class"></select>
+          </div>
+
+          <div class="row">
+            <label>담임 성함</label>
+            <input type="text" id="setting-teacher-name" placeholder="예: 원성호">
+          </div>
+          <p class="note">학년·반·담임 성함은 이 브라우저에만(localStorage) 저장됩니다.</p>
+        </div>
+
+        <div class="panel">
+          <h2>월별 출결 현황 업로드</h2>
+          <div class="row">
+            <label>출결 현황 PDF</label>
+            <input type="file" id="stats-pdf" accept=".pdf">
+          </div>
+          <p id="stats-status" class="save-note"></p>
+          <p class="note">나이스에서 내려받은 "월별 출결 현황" PDF를 올리면, 아래에서 결석·지각·조퇴·결과 건수를 자동으로 분석해서 학생별로 서식을 만들어 줍니다.</p>
+          <p class="note">확인(제출)일자·확인 방법·첨부서류는 결석 사유를 바탕으로 자동으로 채워 넣지만 추정일 뿐이니, 미리보기에서 검토하거나 직접 고쳐주세요. 보호자 성명처럼 PDF에 아예 없는 정보는 빈칸으로 남으니 인쇄 전에 손으로 채워주세요.</p>
+
+          <div id="student-list-wrap" style="display:none;">
+            <h2>학생별 생성 문서</h2>
+            <ul style="padding:0; margin:0;" id="student-list"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-preview">
+        <div class="panel">
+          <h2>미리보기</h2>
+          <p class="note" id="preview-empty">왼쪽 학생 명단에서 문서를 선택하면 여기에 미리보기와 PDF가 표시됩니다.</p>
+          <div class="row" id="preview-actions" style="display:none;">
+            <button type="button" id="download-btn">저장하기</button>
+            <button type="button" id="change-save-dir-btn" class="change-folder-btn">저장 폴더 변경</button>
+            <button type="button" id="open-btn">PDF 열기</button>
+          </div>
+          <p class="save-note" id="preview-save-note" style="display:none;">처음 저장할 때 저장할 폴더를 한 번 선택하면, 다음부터는 같은 폴더에 바로 저장됩니다. 다른 폴더로 바꾸려면 "저장 폴더 변경" 버튼을 눌러주세요.</p>
+
+          <div class="row" id="confirm-date-panel" style="display:none;">
+            <label>확인(제출)일자</label>
+            <input type="date" id="edit-confirm-date">
+          </div>
+          <p class="note" id="confirm-date-note" style="display:none;">출결이 있었던 다음 등교일로 자동 계산했습니다(주말·공휴일이면 그 다음 평일). 다르면 달력에서 직접 골라 바꿔주세요.</p>
+
+          <div id="absence-edit-panel" style="display:none;">
+            <div class="row">
+              <label>확인 방법</label>
+              <select id="edit-confirm-method">
+                <option value="">선택 안 함</option>
+                <option value="학부모 전화상담">학부모 전화상담</option>
+                <option value="대면상담">대면상담</option>
+                <option value="진료확인서">진료확인서</option>
+                <option value="병원 진단서">병원 진단서</option>
+                <option value="학생면담">학생면담</option>
+                <option value="관련공문 확인">관련공문 확인</option>
+                <option value="__custom__">기타(직접입력)</option>
+              </select>
+              <input type="text" id="edit-confirm-method-custom" placeholder="직접 입력" style="display:none;">
+            </div>
+            <div class="row">
+              <label>첨부서류</label>
+              <select id="edit-attachment">
+                <option value="">선택 안 함</option>
+                <option value="진료확인서">진료확인서</option>
+                <option value="병원 진단서">병원 진단서</option>
+                <option value="담임의견서">담임의견서</option>
+                <option value="학부모 의견서">학부모 의견서</option>
+                <option value="관련 공문">관련 공문</option>
+                <option value="__custom__">기타(직접입력)</option>
+              </select>
+              <input type="text" id="edit-attachment-custom" placeholder="직접 입력" style="display:none;">
+            </div>
+            <p class="note">결석 사유를 바탕으로 확인 방법·첨부서류를 자동으로 추정해 넣어뒀습니다. 실제와 다르면 위에서 직접 골라 바꿔주세요 — 바꾸면 아래 미리보기에 바로 반영됩니다.</p>
+          </div>
+
+          <div id="doc" class="document" style="display:none;"></div>
+        </div>
+
+        <div class="panel" style="margin-top: 20px;">
+          <h2>저장 기록</h2>
+          <ul id="save-log" class="save-log"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="save.js"></script>
+  <script src="settings.js"></script>
+  <script src="index.js"></script>
+</body>
+</html>

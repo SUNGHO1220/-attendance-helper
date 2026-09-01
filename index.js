@@ -89,6 +89,12 @@ function splitDate(iso) {
   return { y, m: String(Number(m)), d: String(Number(d)) };
 }
 
+const KOREAN_DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+function koreanDayOfWeek(iso) {
+  if (!iso) return "";
+  return KOREAN_DAY_NAMES[new Date(`${iso}T00:00:00`).getDay()];
+}
+
 function formatDateSlash(iso) {
   const { m, d } = splitDate(iso);
   return m && d ? `${m}/${d}` : "";
@@ -317,6 +323,14 @@ function pickPeriodsForDoc(periodsStr, kind) {
 const CONFIRM_METHOD_OPTIONS = ["학부모 전화상담", "대면상담", "진료확인서", "병원 진단서", "학생면담", "관련공문 확인"];
 const ATTACHMENT_OPTIONS = ["진료확인서", "병원 진단서", "담임의견서", "학부모 의견서", "관련 공문"];
 
+// 지각·조퇴·결과 확인서에서 담임의견서를 자동으로 만들어야 하는 경우(사용자 지정 규칙): 학교 재량으로
+// 출석을 인정해준 지각·조퇴·결과(예: 현장체험학습 중 조퇴)는 결석의 "출석인정결"과 같은 성격이라
+// 학부모 확인이 필요하다고 보고, 결석신고서의 담임의견서와 같은 방식으로 자동 생성한다.
+const OPINION_ELIGIBLE_KINDS = new Set(["지각", "조퇴", "결과"]);
+function isOpinionEligible(category, kind) {
+  return category === "출석인정" && OPINION_ELIGIBLE_KINDS.has(kind);
+}
+
 function suggestConfirmAndAttachment(category, reason) {
   if (category === "출석인정" && reason && reason.includes("교외체험학습")) {
     return { confirmMethod: "교외체험학습 보고서", attachment: "교외체험학습 보고서" };
@@ -401,6 +415,81 @@ function buildAbsenceHtml(d) {
       <div class="school-title">신 언 중 학 교 장</div>
     </div>
   `;
+}
+
+// 담임의견서는 결석신고서든 지각·조퇴·결과 확인서든 원본 문서에 이어 붙이지 않고 완전히 별도의
+// 문서(#opinion-list 안, 별도 PDF)로 만든다(사용자 지정 — 담임 의견서는 원래 학교 서식상 그 자체로
+// 독립된 한 장짜리 문서이기 때문). 4. 2026학년도 신언중 담임 의견서.pdf 서식을 그대로 재현하되,
+// 원본에서 손으로 채우는 빈칸("(  )")은 전부 자동으로 채우므로 빈칸 표시(괄호)는 없애고 값만 넣는다.
+// getOpinionItems()가 문서 종류(결석신고서/지각·조퇴·결과 확인서)에 상관없이 이 함수가 쓸 수 있는
+// 공통 모양({name, number, date, reason, verb, confirmDate})으로 맞춰서 넘긴다 — verb는 담임의견
+// 문장 끝에 들어갈 동사(결석/지각/조퇴/결과)이고, 결석신고서는 결석 첫날(연속 결석이어도 학부모
+// 확인 통화는 결석 당일에 이뤄지므로), 지각·조퇴·결과는 해당 건 당일을 date로 쓴다.
+function buildTeacherOpinionHtml(o) {
+  const evDate = splitDate(o.date);
+  const dow = koreanDayOfWeek(o.date);
+  const confirm = splitDate(o.confirmDate);
+
+  return `
+    <div class="doc-title opinion">담임 의견서</div>
+    <div class="align-right">${escapeHtml(GRADE)}학년 ${escapeHtml(CLASS_NO)}반 ${escapeHtml(o.number)}번</div>
+    <div class="align-right">이름: <span class="blank wide">${escapeHtml(o.name)}</span></div>
+
+    <table class="opinion-table">
+      <tr>
+        <th>담임<br>의견</th>
+        <td>${evDate.m}월 ${evDate.d}일 ${dow}요일 ${escapeHtml(o.reason)}(으)로 인해 ${escapeHtml(o.verb)}함을 학부모와 유선연락으로 확인합니다.</td>
+      </tr>
+    </table>
+
+    <p class="align-center">${confirm.y}년 ${confirm.m}월 ${confirm.d}일</p>
+    <p class="align-center-right">학생 : <span class="blank wide">${escapeHtml(o.name)}</span> (인)</p>
+    <p class="align-center-right">담임교사 : <span class="blank wide">${escapeHtml(TEACHER_NAME)}</span> (인)</p>
+
+    <div class="school-title">신 언 중 학 교</div>
+  `;
+}
+
+// currentDoc(결석신고서/지각·조퇴·결과 확인서 단건·여러건)에서 담임의견서로 만들어야 할 건을
+// 모두 뽑아 buildTeacherOpinionHtml()이 바로 쓸 수 있는 모양으로 정규화한다. 결석신고서는 첨부서류로
+// "담임의견서"를 골랐을 때만(사용자가 직접 고르는 기존 방식), 지각·조퇴·결과 확인서는 출석인정
+// 지각·조퇴·결과 건이면 항상(사용자 지정 — 고를 수 있는 첨부서류 개념이 없는 문서라 자동 생성).
+// 여러건 확인서에 해당 건이 여럿이면 결석신고서와 같은 방식으로 건마다 별도 담임의견서를 만든다.
+function getOpinionItems(doc) {
+  if (!doc) return [];
+
+  if (doc.type === "absence") {
+    if (doc.data.attachment !== "담임의견서") return [];
+    return [{
+      label: "담임의견서",
+      name: doc.data.name, number: doc.data.number,
+      date: doc.data.startDate, reason: doc.data.reason, verb: "결석",
+      confirmDate: doc.data.confirmDate,
+    }];
+  }
+
+  if (doc.type === "late-single") {
+    if (!isOpinionEligible(doc.data.category, doc.data.kind)) return [];
+    return [{
+      label: `담임의견서 (${formatDateSlash(doc.data.date)}, 출석인정${doc.data.kind})`,
+      name: doc.data.name, number: doc.data.number,
+      date: doc.data.date, reason: doc.data.reason, verb: doc.data.kind,
+      confirmDate: doc.data.confirmDate,
+    }];
+  }
+
+  if (doc.type === "late-multi") {
+    return doc.data.events
+      .filter((ev) => isOpinionEligible(ev.category, ev.kind))
+      .map((ev) => ({
+        label: `담임의견서 (${formatDateSlash(ev.date)}, 출석인정${ev.kind})`,
+        name: doc.data.name, number: doc.data.number,
+        date: ev.date, reason: ev.reason, verb: ev.kind,
+        confirmDate: ev.confirmDate,
+      }));
+  }
+
+  return [];
 }
 
 function buildLateSingleHtml(d) {
@@ -526,6 +615,11 @@ function buildStudentDocs(students) {
         });
       } else if (s.lateEvents.length > 1) {
         const lastEvent = s.lateEvents[s.lateEvents.length - 1]; // 날짜순 정렬됨(classifyEvents) — 마지막이 최종일
+        // 출석인정지각·조퇴·결과 건의 담임의견서(getOpinionItems)는 건마다 별도 문서라 건별 확인일자가
+        // 필요하다 — 문서 전체의 confirmDate(마지막 건 기준)와는 별개로 건마다 계산해 붙여둔다.
+        s.lateEvents.forEach((ev) => {
+          ev.confirmDate = nextSchoolDay(ev.date, s.absenceDates);
+        });
         docs.push({
           type: "late-multi",
           label: `지각·조퇴·결과 확인서 (여러건, ${s.lateEvents.length}건)`,
@@ -585,6 +679,64 @@ function renderCurrentDocPreview() {
   docEl.className = "document" + (currentDoc.type === "absence" ? " absence-doc" : " tall");
   docEl.innerHTML = buildDocHtml(currentDoc);
   docEl.style.display = "";
+  renderOpinionPreview();
+}
+
+// 결석신고서에서 첨부서류로 "담임의견서"를 골랐거나, 지각·조퇴·결과 확인서에 출석인정지각·조퇴·결과
+// 건이 있는 동안, 완전히 별도의 문서(#opinion-list 안)로 담임의견서를 만들어 보여준다 — 여러건
+// 확인서는 해당 건이 여럿이면 건마다 하나씩(사용자 지정: 결석신고서·확인서 본문과 합쳐진 한 장이
+// 아니라 건별로 따로 만든 한 장이어야 함). 첨부서류·확인일자를 고칠 때마다 renderCurrentDocPreview()
+// 를 통해 같이 다시 그려진다.
+function renderOpinionPreview() {
+  const items = getOpinionItems(currentDoc);
+  const listEl = $("opinion-list");
+  listEl.innerHTML = "";
+  $("opinion-section").style.display = items.length ? "" : "none";
+
+  items.forEach((item) => {
+    const block = document.createElement("div");
+    block.className = "opinion-item";
+
+    if (items.length > 1) {
+      const heading = document.createElement("p");
+      heading.className = "note";
+      heading.textContent = item.label;
+      block.appendChild(heading);
+    }
+
+    const row = document.createElement("div");
+    row.className = "row";
+    const downloadBtn = document.createElement("button");
+    downloadBtn.type = "button";
+    downloadBtn.textContent = "저장하기";
+    const openBtn = document.createElement("button");
+    openBtn.type = "button";
+    openBtn.textContent = "PDF 열기";
+    row.appendChild(downloadBtn);
+    row.appendChild(openBtn);
+    block.appendChild(row);
+
+    // 나머지 3개 실제 서식(결석신고서/지각·조퇴·결과 확인서)과 같은 용지 느낌을 내려면 그 서식들과
+    // 같은 "tall" 처리(굴림체, 줄간격 2.4, 위/아래 여백)가 필요하다 — 이 클래스가 없으면 기본값
+    // (Pretendard, 줄간격 2.3, 여백 110px)으로 렌더링되어 실제 담임 의견서 서식과 확연히 달라 보였다.
+    const docEl = document.createElement("div");
+    docEl.className = "document tall opinion-doc";
+    docEl.innerHTML = buildTeacherOpinionHtml(item);
+    block.appendChild(docEl);
+
+    downloadBtn.addEventListener("click", async () => {
+      const pdf = await buildPortraitPdf(docEl);
+      const filename = buildOpinionFilename(item);
+      await savePdfBlob(pdf.output("blob"), filename);
+      logSavedFile("attendance-batch", filename);
+    });
+    openBtn.addEventListener("click", async () => {
+      const pdf = await buildPortraitPdf(docEl);
+      window.open(pdf.output("bloburl"), "_blank");
+    });
+
+    listEl.appendChild(block);
+  });
 }
 
 // 학생 명단에서 문서를 고르면 미리보기만 갱신한다 — PDF는 "PDF 열기" 버튼을 눌러야만 연다(사용자 지정).
@@ -653,6 +805,19 @@ function buildFilename(doc) {
     typeLabel = "지각조퇴결과확인서(여러건)";
   }
   return `${dateStr}(${doc.data.name})_${typeLabel}.pdf`;
+}
+
+// 담임의견서는 원본 문서(결석신고서/지각·조퇴·결과 확인서)와 별개의 파일이므로 파일명도 따로
+// 만든다(사용자 지정). getOpinionItems()가 만든 정규화된 항목을 받는다 — 여러건 확인서에서 같은
+// 학생이 담임의견서를 여러 개 받을 수 있어(건마다 별도), 파일명이 겹치지 않도록 해당 건 날짜를 붙인다.
+function buildOpinionFilename(item) {
+  const today = new Date();
+  const confirm = splitDate(item.confirmDate);
+  const dateStr = confirm.y && confirm.m && confirm.d
+    ? formatSaveDate(confirm.y, confirm.m, confirm.d)
+    : formatSaveDate(today.getFullYear(), today.getMonth() + 1, today.getDate());
+  const eventDate = formatDateSlash(item.date).replace("/", "-");
+  return `${dateStr}(${item.name})_담임의견서(${eventDate}).pdf`;
 }
 
 // 이 기능(로컬 폴더에 바로 저장)을 지원하지 않는 브라우저(Firefox/Safari 등)에서는

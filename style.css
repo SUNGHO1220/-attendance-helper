@@ -743,6 +743,55 @@ button:hover {
   margin-top: 24px;
 }
 
+/* 담임의견서(결석신고서 첨부서류 선택 또는 출석인정지각·조퇴·결과 건에서 자동 생성되는 서식) —
+   지각·조퇴·결과 확인서(여러건)는 해당 건이 여럿이면 .opinion-item이 여러 개 나란히 쌓인다. */
+.opinion-item + .opinion-item {
+  margin-top: 32px;
+  padding-top: 32px;
+  border-top: 1px dashed var(--border);
+}
+
+/* 담임의견서만 다른 "tall" 서식(지각·조퇴·결과 확인서 등)보다 글자 크기를 조금 더 키운다
+   (사용자 지정) — .document.tall 자체를 고치면 그 서식들도 같이 커지므로 별도 클래스로 범위를 좁힌다. */
+.document.tall.opinion-doc {
+  font-size: 16px;
+}
+
+/* 담임의견서 제목("담임 의견서")은 다른 서식 제목(예: "결 석 신 고 서")과 달리 글자마다 벌리지
+   않고 단어 사이에만 공백이 있다(원본 PDF 확인) — .doc-title의 기본 letter-spacing을 없앤다. */
+.doc-title.opinion {
+  letter-spacing: normal;
+}
+
+.opinion-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 24px;
+}
+
+.opinion-table th, .opinion-table td {
+  border: 1.5px solid #000;
+  padding: 14px;
+  font-size: inherit;
+}
+
+.opinion-table th {
+  width: 70px;
+  text-align: center;
+  vertical-align: middle;
+  font-weight: bold;
+}
+
+.opinion-table td {
+  text-align: left;
+  vertical-align: middle;
+  line-height: 1.8;
+  /* 원본 서식은 담임의견 칸이 실제 문장 길이보다 훨씬 큰 박스라(손으로 덧붙여 쓸 여백 포함) —
+     내용만큼만 줄어들지 않도록 높이를 고정한다(사용자 지정: 기존 340px보다 훨씬 크게, 다만
+     A4 한 페이지(문서 전체 높이 1123px) 안에 나머지 요소와 함께 들어가도록 상한을 뒀다). */
+  height: 300px;
+}
+
 /* 결석신고서(absence.html) 전용: 제목류(24px/20px) 외 본문은 12px, 서체는 굴림체 */
 .document.absence-doc {
   font-family: "굴림체", Gulim, "맑은 고딕", sans-serif;

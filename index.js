@@ -324,11 +324,13 @@ const CONFIRM_METHOD_OPTIONS = ["학부모 전화상담", "대면상담", "진�
 const ATTACHMENT_OPTIONS = ["진료확인서", "병원 진단서", "담임의견서", "학부모 의견서", "관련 공문"];
 
 // 지각·조퇴·결과 확인서에서 담임의견서를 자동으로 만들어야 하는 경우(사용자 지정 규칙): 학교 재량으로
-// 출석을 인정해준 지각·조퇴·결과(예: 현장체험학습 중 조퇴)는 결석의 "출석인정결"과 같은 성격이라
-// 학부모 확인이 필요하다고 보고, 결석신고서의 담임의견서와 같은 방식으로 자동 생성한다.
+// 출석을 인정해준 지각·조퇴·결과(예: 현장체험학습 중 조퇴)나 질병으로 인한 지각·조퇴·결과(예: 병원
+// 진료로 조퇴)는 결석의 "출석인정결"·"병결"과 같은 성격이라 학부모 확인이 필요하다고 보고, 결석신고서의
+// 담임의견서와 같은 방식으로 자동 생성한다.
+const OPINION_ELIGIBLE_CATEGORIES = new Set(["출석인정", "질병"]);
 const OPINION_ELIGIBLE_KINDS = new Set(["지각", "조퇴", "결과"]);
 function isOpinionEligible(category, kind) {
-  return category === "출석인정" && OPINION_ELIGIBLE_KINDS.has(kind);
+  return OPINION_ELIGIBLE_CATEGORIES.has(category) && OPINION_ELIGIBLE_KINDS.has(kind);
 }
 
 function suggestConfirmAndAttachment(category, reason) {
@@ -453,8 +455,9 @@ function buildTeacherOpinionHtml(o) {
 // currentDoc(결석신고서/지각·조퇴·결과 확인서 단건·여러건)에서 담임의견서로 만들어야 할 건을
 // 모두 뽑아 buildTeacherOpinionHtml()이 바로 쓸 수 있는 모양으로 정규화한다. 결석신고서는 첨부서류로
 // "담임의견서"를 골랐을 때만(사용자가 직접 고르는 기존 방식), 지각·조퇴·결과 확인서는 출석인정
-// 지각·조퇴·결과 건이면 항상(사용자 지정 — 고를 수 있는 첨부서류 개념이 없는 문서라 자동 생성).
-// 여러건 확인서에 해당 건이 여럿이면 결석신고서와 같은 방식으로 건마다 별도 담임의견서를 만든다.
+// 또는 질병 지각·조퇴·결과 건이면 항상(사용자 지정 — 고를 수 있는 첨부서류 개념이 없는 문서라
+// 자동 생성). 여러건 확인서에 해당 건이 여럿이면 결석신고서와 같은 방식으로 건(날짜)마다 별도
+// 담임의견서를 만든다(사용자 지정: 날짜별로 각각 생성).
 function getOpinionItems(doc) {
   if (!doc) return [];
 
@@ -471,7 +474,7 @@ function getOpinionItems(doc) {
   if (doc.type === "late-single") {
     if (!isOpinionEligible(doc.data.category, doc.data.kind)) return [];
     return [{
-      label: `담임의견서 (${formatDateSlash(doc.data.date)}, 출석인정${doc.data.kind})`,
+      label: `담임의견서 (${formatDateSlash(doc.data.date)}, ${doc.data.category}${doc.data.kind})`,
       name: doc.data.name, number: doc.data.number,
       date: doc.data.date, reason: doc.data.reason, verb: doc.data.kind,
       confirmDate: doc.data.confirmDate,
@@ -482,7 +485,7 @@ function getOpinionItems(doc) {
     return doc.data.events
       .filter((ev) => isOpinionEligible(ev.category, ev.kind))
       .map((ev) => ({
-        label: `담임의견서 (${formatDateSlash(ev.date)}, 출석인정${ev.kind})`,
+        label: `담임의견서 (${formatDateSlash(ev.date)}, ${ev.category}${ev.kind})`,
         name: doc.data.name, number: doc.data.number,
         date: ev.date, reason: ev.reason, verb: ev.kind,
         confirmDate: ev.confirmDate,
